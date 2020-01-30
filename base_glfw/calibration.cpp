@@ -185,7 +185,7 @@ namespace zw {
     }
 
     
-    std::vector<std::vector<double>> getA(std::vector<cv::Point2d> pW, std::vector<cv::Point2d> pImg) {
+    std::vector<std::vector<double>> getMatrixA(const std::vector<cv::Point2d>& pW, const std::vector<cv::Point2d>& pImg) {
 
         std::vector<std::vector<double>> A;
 
@@ -204,22 +204,59 @@ namespace zw {
     }
 
 
+    dlib::matrix<double, 3, 3> homographyEstimation(std::vector<cv::Point2d> pW,
+                                              std::vector<cv::Point2d> pImg,
+                                              int rowNum, int colNum) {
+        std::vector<std::vector<double>> A0 = getMatrixA(pW, pImg);
+
+        dlib::matrix<double> A(A0.size(), 9);
+
+        for (int r = 0; r < A0.size(); ++r) {
+            for (int c = 0; c < A0[0].size(); ++c) {
+                A(r, c) = A0[r][c];
+            }
+        }
+
+        dlib::matrix<double> U, D, V;
+
+        dlib::svd(A, U, D, V);
+
+        // ? How to make D ordered?
+        dlib::matrix<double, 9, 1> H = dlib::colm(V, 8);
+        H.set_size(3, 3);
+
+        return H;
+    }
+
     void test() {
-        dlib::matrix<double, 3, 1> y;
-        dlib::matrix<double> M(3, 3);
+        dlib::matrix<double> U(4, 4), D(4, 2), V(2, 2);
+        dlib::matrix<double> M(4, 2);
 
-        M = 54.2, 7.4, 12.1,
-            1, 2, 3,
-            5.9, 0.05, 1;
+        M = 1, 3,
+            1, 2,
+            1, -1,
+            2, 1;
 
-        y = 3.5,
-            1.2,
-            7.8;
+        //M = -0.37796, -0.37796, -0.37796,
+        //    -0.75593, -0.68252, -0.36401,
+        //    0.59152, 0.22751, -0.17643,
+        //    0.73034, 0.43629, -0.4951,
+        //    -0.60015, 0.43731, -0.56293, 0.36288;
 
-        dlib::matrix<double> x = dlib::inv(M) * y;
-        std::cout << "x : \n " << x << std::endl;
+        dlib::svd(M, U, D, V);
 
-        std::cout << "M * x - y : " << M * x - y << std::endl;
+        dlib::matrix<double, 2, 1> v0 = dlib::colm(V, 0);
+        dlib::matrix<double, 2, 1> v1 = dlib::colm(V, 1);
+        /*
+        std::cout << "U : \n " << U << std::endl;
+        std::cout << "D : \n " << D << std::endl;
+        std::cout << "V : \n " << V << std::endl;
+        std::cout << "M : \n " << U * D * dlib::trans(V) << std::endl;*/
+
+        std::cout << "M * v0 : " << std::endl << M * v0 << std::endl;
+        std::cout << "M * v1 : " << std::endl << M * v1 << std::endl;
+
+        //std::cout << "M * x - y : " << M * x - y << std::endl;
 
         std::cout << "*******************************" << std::endl;
     }

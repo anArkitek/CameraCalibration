@@ -83,7 +83,7 @@ namespace zw {
      * Return:
      *      matrix A of shape (2*pW.size()) * 9
      */
-    std::vector<std::vector<double>> getA(std::vector<cv::Point2d> pW, std::vector<cv::Point2d> pImg);
+    std::vector<std::vector<double>> getMatrixA(const std::vector<cv::Point2d>& pW, const std::vector<cv::Point2d>& pImg);
 
 
     void test();

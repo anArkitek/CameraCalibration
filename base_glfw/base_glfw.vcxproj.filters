@@ -13,9 +13,6 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Eigen">
-      <UniqueIdentifier>{17322040-b090-4772-a393-091410ba9214}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Imgui">
       <UniqueIdentifier>{2a53e065-579c-4ae7-bc2a-5a02559792d9}</UniqueIdentifier>
     </Filter>
@@ -94,21 +91,6 @@
     </ClInclude>
     <ClInclude Include="calibration.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="eigen-3.3.7\Eigen\src\SVD\BDCSVD.h">
-      <Filter>Eigen</Filter>
-    </ClInclude>
-    <ClInclude Include="eigen-3.3.7\Eigen\src\SVD\JacobiSVD.h">
-      <Filter>Eigen</Filter>
-    </ClInclude>
-    <ClInclude Include="eigen-3.3.7\Eigen\src\SVD\JacobiSVD_LAPACKE.h">
-      <Filter>Eigen</Filter>
-    </ClInclude>
-    <ClInclude Include="eigen-3.3.7\Eigen\src\SVD\SVDBase.h">
-      <Filter>Eigen</Filter>
-    </ClInclude>
-    <ClInclude Include="eigen-3.3.7\Eigen\src\SVD\UpperBidiagonalization.h">
-      <Filter>Eigen</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

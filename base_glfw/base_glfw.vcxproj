@@ -148,11 +148,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="calibration.h" />
-    <ClInclude Include="eigen-3.3.7\Eigen\src\SVD\BDCSVD.h" />
-    <ClInclude Include="eigen-3.3.7\Eigen\src\SVD\JacobiSVD.h" />
-    <ClInclude Include="eigen-3.3.7\Eigen\src\SVD\JacobiSVD_LAPACKE.h" />
-    <ClInclude Include="eigen-3.3.7\Eigen\src\SVD\SVDBase.h" />
-    <ClInclude Include="eigen-3.3.7\Eigen\src\SVD\UpperBidiagonalization.h" />
     <ClInclude Include="imgui\imconfig.h" />
     <ClInclude Include="imgui\imgui.h" />
     <ClInclude Include="imgui\imgui_impl_glfw.h" />
