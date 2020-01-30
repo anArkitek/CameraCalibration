@@ -63,28 +63,40 @@ void framebufferSizeCallback(GLFWwindow* w, int width, int height);
 // OpenCV
 cv::Mat src, src_gray;
 cv::Mat dst, detected_edges;
-int edgeThresh = 1;
-int lowThreshold=100;
-int const max_lowThreshold = 100;
-int kernel_size = 3;
-const char* window_name = "Edge Map";
 
 
 int main() {
 
+	zw::test();
+
 	/// Load an image
-	src = cv::imread("srcImgs/000.jpeg");
+	src = cv::imread("srcImgs/003.jpeg");
 
 	Mat dst, cdst;
 	Canny(src, dst, 100, 200, 3);
 	cvtColor(dst, cdst, COLOR_GRAY2BGR);
 
 	vector<Vec2f> lines; // will hold the results of the detection
-	HoughLines(dst, lines, 1, CV_PI / 180, 250, 0, 0); // runs the actual detection
+	HoughLines(dst, lines, 1, CV_PI / 180, 180, 0, 0); // runs the actual detection
+
+	// Draw the lines
+	//for (size_t i = 0; i < lines.size(); i++)
+	//{
+	//	float rho = lines[i][0], theta = lines[i][1];
+	//	Point pt1, pt2;
+	//	double a = cos(theta), b = sin(theta);
+	//	double x0 = a * rho, y0 = b * rho;
+	//	pt1.x = cvRound(x0 + 1000 * (-b));
+	//	pt1.y = cvRound(y0 + 1000 * (a));
+	//	pt2.x = cvRound(x0 - 1000 * (-b));
+	//	pt2.y = cvRound(y0 - 1000 * (a));
+	//	line(cdst, pt1, pt2, Scalar(0, 0, 255), 3, LINE_AA);
+	//}
+
 
 	std::vector<std::vector<cv::Vec2f>> proLines = zw::getTargetLines(lines, 4, 7);
 
-	// Draw the lines
+	//Draw the lines
 	for (size_t i = 0; i < proLines.size(); i++)
 	{
 		for (size_t j = 0; j < proLines[i].size(); ++j)
@@ -102,9 +114,13 @@ int main() {
 		}
 	}
 
-	std::vector<cv::Point> points = zw::linesIntersect(proLines[0], proLines[1]);
+	std::vector<cv::Point2d> points = zw::twoSetLinesIntersectOnPlane(proLines[0], proLines[1]);
 
-	// Draw Points
+
+	/******************************/
+	std::vector<cv::Point2d> corners = zw::initializeCornersOnCalibPad(4, 7, 20);
+
+	//Draw Points
 	int cnt = 0;
 	for (auto point : points) {
 		cv::circle(cdst, point, 10, Scalar(0, 255, 0), 10);

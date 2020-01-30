@@ -12,6 +12,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "dlib/matrix.h"
 
 # define M_PI           3.14159265358979323846  /* pi */
 
@@ -41,7 +42,7 @@ namespace zw {
      * Return:
      *      [ [x0, y0], [x1, y1], ...]
      */
-    std::vector<cv::Point> linesIntersect(std::vector<cv::Vec2f> horiLines, std::vector<cv::Vec2f> verLines);
+    std::vector<cv::Point2d> twoSetLinesIntersectOnPlane(std::vector<cv::Vec2f> horiLines, std::vector<cv::Vec2f> verLines);
 
     /*
      * Get the intersection of two lines
@@ -51,7 +52,7 @@ namespace zw {
      * Return:
      *      [x, y]
      */
-    cv::Point twoLinesIntersectOnPlane(cv::Vec2f line1, cv::Vec2f line2);
+    cv::Point2d twoLinesIntersectOnPlane(cv::Vec2f line1, cv::Vec2f line2);
 
     /* 
      *Transform a line represented by rho-theta to homogeneous form: ax + by + c = 0
@@ -61,4 +62,29 @@ namespace zw {
      *      [a, b, c]
      */
     glm::vec3 rhoThetaToHomo(cv::Vec2f line);
+
+    /*
+     * Get the real coordinates of corners on the calibration pad
+     * Args:
+     *      row : row number
+     *      col : col number
+     *      length : lenth of edges of the blocks
+     * Return:
+     *      coordinates [[x0, y0], [x1, y1], ...]
+     */
+    std::vector<cv::Point2d> initializeCornersOnCalibPad(int row, int col, int length);
+
+
+    /*
+     * Get the matrix A in equation Ah = 0; h is the vector composed of [h11, h12, ..., h33]
+     * Args:
+     *      pW: the vector of point coordinates on the pad
+     *      pImg: the vector of point coordinates on the image
+     * Return:
+     *      matrix A of shape (2*pW.size()) * 9
+     */
+    std::vector<std::vector<double>> getA(std::vector<cv::Point2d> pW, std::vector<cv::Point2d> pImg);
+
+
+    void test();
 }
