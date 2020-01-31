@@ -85,6 +85,13 @@ namespace zw {
      */
     std::vector<std::vector<double>> getMatrixA(const std::vector<cv::Point2d>& pW, const std::vector<cv::Point2d>& pImg);
 
+    dlib::matrix<double, 3, 3> homographyestimation(std::vector<cv::Point2d> pw, std::vector<cv::Point2d> pimg);
+
+    // Vb = 0
+    dlib::matrix<double> getMatrixV(const std::vector<dlib::matrix<double, 3, 3>>& Hall);
+
+    dlib::matrix<double> getVectorb(const std::vector<dlib::matrix<double, 3, 3>>& V);
+
 
     void test();
 }

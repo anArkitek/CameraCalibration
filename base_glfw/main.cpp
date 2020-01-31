@@ -2,11 +2,13 @@
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
-#include <cstdio>
 
+#include <cstdio>
 #include <iostream>
 #include <vector>
 #include <cassert>
+#include <fstream>
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -67,8 +69,6 @@ cv::Mat dst, detected_edges;
 
 int main() {
 
-	zw::test();
-
 	/// Load an image
 	src = cv::imread("srcImgs/003.jpeg");
 
@@ -128,8 +128,25 @@ int main() {
 		++cnt;
 	}
 
+	ofstream myfile("points.txt");
 
+	if (myfile.is_open())
+	{
+		myfile << "Points on images: \n";
 
+		for (int i = 0; i < points.size(); ++i) {
+			myfile << points[i].x << " " << points[i].y << std::endl;
+		}
+
+		myfile << "Corners on Clibration Pad: \n";
+		for (int i = 0; i < corners.size(); ++i) {
+			myfile << corners[i].x << " " << corners[i].y << std::endl;
+		}
+	}
+
+	auto testResult = zw::homographyestimation(corners, points);
+
+	return 0;
 	namedWindow("source", WINDOW_GUI_NORMAL);
 	namedWindow("detected lines", WINDOW_GUI_NORMAL);
 

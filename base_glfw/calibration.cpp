@@ -175,8 +175,8 @@ namespace zw {
         std::vector<cv::Point2d> corners;
         for (int i = 0; i < row; ++i) {
             for (int j = 0; j < col; ++j) {
-                double x = static_cast<double>(i) * length;
-                double y = static_cast<double>(j) * length;
+                double y = static_cast<double>(i) * length;
+                double x = static_cast<double>(j) * length;
                 corners.push_back(cv::Point2d(x, y));
             }
         }
@@ -200,14 +200,19 @@ namespace zw {
 
         assert(A.size() == 2 * pW.size() && A[0].size() == 9, "The matrix A is of wrong shape!");
 
+        //for (int i = 0; i < A.size(); ++i) {
+        //    for (int j = 0; j < A[0].size(); ++j) {
+        //        std::cout << A[i][j] << " ";
+        //    }
+        //    std::cout << std::endl;
+        //}
+
         return A;
     }
 
 
-    dlib::matrix<double, 3, 3> homographyEstimation(std::vector<cv::Point2d> pW,
-                                              std::vector<cv::Point2d> pImg,
-                                              int rowNum, int colNum) {
-        std::vector<std::vector<double>> A0 = getMatrixA(pW, pImg);
+    dlib::matrix<double, 3, 3> homographyestimation(std::vector<cv::Point2d> pw, std::vector<cv::Point2d> pimg) {
+        std::vector<std::vector<double>> A0 = getMatrixA(pw, pimg);
 
         dlib::matrix<double> A(A0.size(), 9);
 
@@ -221,12 +226,66 @@ namespace zw {
 
         dlib::svd(A, U, D, V);
 
-        // ? How to make D ordered?
-        dlib::matrix<double, 9, 1> H = dlib::colm(V, 8);
-        H.set_size(3, 3);
-
+        dlib::matrix<double> Hv(9, 1);
+        Hv = dlib::colm(V, 8);
+        
+        dlib::matrix<double, 3, 3> H;
+        H = Hv(0), Hv(1), Hv(2), Hv(3), Hv(4), Hv(5), Hv(6), Hv(7), Hv(8);
+        // std::cout << "H matrix is \n" << H << std::endl << "=================" << std::endl;
         return H;
     }
+
+
+    dlib::matrix<double> getMatrixV(const std::vector<dlib::matrix<double, 3, 3>>& Hall) {
+        dlib::matrix<double> V(Hall.size() * 2, 9);
+        int cnt = 0;
+        for (auto H : Hall) {
+            int i = 0; int j = 1;
+            dlib::matrix<double> v12(1, 9);
+            v12 = H(0, i) * H(0, j),                     H(0, i) * H(1, j) + H(1, i) * H(0, j), H(1, i) * H(1, j), 
+                  H(2, i) * H(0, j) + H(0, i) * H(2, j), H(2, i) * H(1, j) + H(1, i) * H(2, j), H(2, i) * H(2, j);
+            i = 1; j = 1;
+            dlib::matrix<double> v11(1, 9);
+            v11 = H(0, i) * H(0, j),                     H(0, i) * H(1, j) + H(1, i) * H(0, j), H(1, i) * H(1, j), 
+                  H(2, i) * H(0, j) + H(0, i) * H(2, j), H(2, i) * H(1, j) + H(1, i) * H(2, j), H(2, i) * H(2, j);
+            i = 2; j = 2;
+            dlib::matrix<double> v22(1, 9);
+            v22 = H(0, i) * H(0, j),                     H(0, i) * H(1, j) + H(1, i) * H(0, j), H(1, i) * H(1, j), 
+                  H(2, i) * H(0, j) + H(0, i) * H(2, j), H(2, i) * H(1, j) + H(1, i) * H(2, j), H(2, i) * H(2, j);
+
+            dlib::set_rowm(V, cnt) = v12;
+            dlib::set_rowm(V, cnt + 1) = v11 - v12;
+            cnt += 2;
+        }
+        return V;
+    }
+    
+
+    dlib::matrix<double> getVectorb(const dlib::matrix<double>& V) {
+        dlib::matrix<double> U, D, T;
+        dlib::svd(V, U, D, T);
+        assert(T.nr() == 6, "Issues with get Vector b");
+        dlib::matrix<double, 6, 1> b = dlib::colm(T, 5);
+        return b;
+    }
+    
+
+    dlib::matrix<double, 3, 3> getIntrinsicMatrix(const dlib::matrix<double, 6, 1>& b) {
+        double y0 = (b(2) * b(4) - b(1) * b(5)) / (b(1) * b(3) - b(2) * b(2));
+        double lambda = b(6) - (b(4) * b(4) + y0 * (b(2) * b(4) - b(1) * b(5))) / b(1);
+        double ax = std::sqrt(lambda / b(1));
+        double ay = std::sqrt(lambda * b(1) / (b(1) * b(3) - b(2) * b(2)));
+        double s = - b(2) * ax * ax * ay / lambda;
+        double x0 = s * y0 / ay - b(4) * ax * ax / lambda;
+        dlib::matrix<double, 3, 3> K;
+        K = ax, s,  x0, 
+            0,  ay, y0, 
+            0,  0,  1;
+        return K;
+    }
+
+
+
 
     void test() {
         dlib::matrix<double> U(4, 4), D(4, 2), V(2, 2);
@@ -237,21 +296,11 @@ namespace zw {
             1, -1,
             2, 1;
 
-        //M = -0.37796, -0.37796, -0.37796,
-        //    -0.75593, -0.68252, -0.36401,
-        //    0.59152, 0.22751, -0.17643,
-        //    0.73034, 0.43629, -0.4951,
-        //    -0.60015, 0.43731, -0.56293, 0.36288;
 
         dlib::svd(M, U, D, V);
 
         dlib::matrix<double, 2, 1> v0 = dlib::colm(V, 0);
         dlib::matrix<double, 2, 1> v1 = dlib::colm(V, 1);
-        /*
-        std::cout << "U : \n " << U << std::endl;
-        std::cout << "D : \n " << D << std::endl;
-        std::cout << "V : \n " << V << std::endl;
-        std::cout << "M : \n " << U * D * dlib::trans(V) << std::endl;*/
 
         std::cout << "M * v0 : " << std::endl << M * v0 << std::endl;
         std::cout << "M * v1 : " << std::endl << M * v1 << std::endl;
