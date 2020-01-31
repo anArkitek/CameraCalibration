@@ -3,6 +3,9 @@
 namespace zw {
 
     int calibration(int nImg, int nHoriLines, int nColLines, int lenBlock) {
+
+        std::vector<dlib::matrix<double, 3, 3>> Hall;
+
         for (int iImg = 0; iImg < nImg; ++iImg) {
             std::string filename = "srcImgs/00" + std::to_string(iImg) + ".jpeg";
             cv::Mat src = cv::imread(filename);
@@ -71,17 +74,7 @@ namespace zw {
             
             dlib::matrix<double, 3, 3> H = zw::homographyestimation(cornersWorld, pointsImg);
 
-            // get V11 - V12 && V12
-
-            // Get b
-
-            // Get intrinsic matrix
-
-            // Get extrinsic matrix
-
-            // un-distortion
-
-            // lm
+            Hall.push_back(H);
 
             if (bShowImgs) {
                 cv::namedWindow("source", cv::WINDOW_GUI_NORMAL);
@@ -94,6 +87,15 @@ namespace zw {
             }
             
         }
+
+        dlib::matrix<double> V = getMatrixV(Hall);
+
+        assert(V.nr() == 2 * nImg, "Incorrect Dimension of Matrix V!");
+
+        dlib::matrix<double, 6, 1> b = getVectorb(V);
+
+        dlib::matrix<double, 3, 3> K = getIntrinsicMatrix(b);
+
 
 
         return 1;
