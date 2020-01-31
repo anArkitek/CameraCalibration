@@ -354,3 +354,4 @@ MigrationBackup/
 
 # Added by myself
 .idb
+.tlog

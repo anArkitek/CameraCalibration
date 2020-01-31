@@ -3,6 +3,7 @@
 #include <vector>
 #include <cmath>
 #include <iostream>
+#include <fstream>
 
 #include "opencv2/core.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
@@ -14,10 +15,18 @@
 
 #include "dlib/matrix.h"
 
-# define M_PI           3.14159265358979323846  /* pi */
+#define M_PI                    3.14159265358979323846  /* pi */
+
+#define bDrawProcessedLines     false
+#define bDrawPoints             false
+#define bSavePointsAndCorners   false
+#define bShowImgs               false
 
 
 namespace zw {
+
+
+    int calibration(int nImg, int nHoriLines = 4, int nColLines = 7, int lenBlock = 20);
      /*
       * After edge detection and simple Hough transform, we have a lot of duplicate lines,
       * this function helps us to get the unique lines of our target horizontal line nums and vertical line nums

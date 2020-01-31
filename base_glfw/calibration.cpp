@@ -2,6 +2,103 @@
 
 namespace zw {
 
+    int calibration(int nImg, int nHoriLines, int nColLines, int lenBlock) {
+        for (int iImg = 0; iImg < nImg; ++iImg) {
+            std::string filename = "srcImgs/00" + std::to_string(iImg) + ".jpeg";
+            cv::Mat src = cv::imread(filename);
+
+            cv::Mat dst, cdst;
+            Canny(src, dst, 100, 200, 3);
+            cvtColor(dst, cdst, cv::COLOR_GRAY2BGR);
+
+            std::vector<cv::Vec2f> lines; // will hold the results of the detection
+            HoughLines(dst, lines, 1, CV_PI / 180, 180, 0, 0); // runs the actual detection
+
+            std::vector<std::vector<cv::Vec2f>> processedLines = getTargetLines(lines, 4, 7);
+
+            if (bDrawProcessedLines) {
+                for (size_t i = 0; i < processedLines.size(); i++)
+                {
+                    for (size_t j = 0; j < processedLines[i].size(); ++j)
+                    {
+                        double rho = processedLines[i][j][0], theta = processedLines[i][j][1];
+
+                        cv::Point pt1, pt2;
+                        double a = cos(theta), b = sin(theta);
+                        double x0 = a * rho, y0 = b * rho;
+                        pt1.x = cvRound(x0 + 5000 * (-b));
+                        pt1.y = cvRound(y0 + 5000 * (a));
+                        pt2.x = cvRound(x0 - 5000 * (-b));
+                        pt2.y = cvRound(y0 - 5000 * (a));
+                        line(cdst, pt1, pt2, cv::Scalar(0, 0, 255), 3, cv::LINE_AA);
+                    }
+                }
+            }
+
+            std::vector<cv::Point2d> pointsImg = twoSetLinesIntersectOnPlane(processedLines[0], processedLines[1]);
+
+            std::vector<cv::Point2d> cornersWorld = zw::initializeCornersOnCalibPad(nHoriLines, nColLines, lenBlock);
+
+            if (bDrawPoints) {
+                int cnt = 0;
+                for (auto point : pointsImg) {
+                    cv::circle(cdst, point, 10, cv::Scalar(0, 255, 0), 10);
+                    std::cout << cnt << ": " << point.x << ", \t" << point.y << std::endl;
+                    ++cnt;
+                }
+            }
+
+            if (bSavePointsAndCorners) {
+                std::ofstream myfile("points.txt", std::ofstream::out | std::ofstream::app);
+
+                if (myfile.is_open())
+                {
+
+                    myfile << "==============================================\n";
+                    myfile << "Image Order " << std::to_string(iImg) << "\n";
+                    myfile << "Points on images: \n";
+
+                    for (int i = 0; i < pointsImg.size(); ++i) {
+                        myfile << pointsImg[i].x << " " << pointsImg[i].y << std::endl;
+                    }
+
+                    myfile << "Corners on Clibration Pad: \n";
+                    for (int i = 0; i < cornersWorld.size(); ++i) {
+                        myfile << cornersWorld[i].x << " " << cornersWorld[i].y << std::endl;
+                    }
+                }
+            }
+            
+            dlib::matrix<double, 3, 3> H = zw::homographyestimation(cornersWorld, pointsImg);
+
+            // get V11 - V12 && V12
+
+            // Get b
+
+            // Get intrinsic matrix
+
+            // Get extrinsic matrix
+
+            // un-distortion
+
+            // lm
+
+            if (bShowImgs) {
+                cv::namedWindow("source", cv::WINDOW_GUI_NORMAL);
+                cv::namedWindow("detected lines", cv::WINDOW_GUI_NORMAL);
+
+                cv::imshow("source", src);
+                cv::imshow("detected lines", cdst);
+
+                cv::waitKey();
+            }
+            
+        }
+
+
+        return 1;
+    }
+
     std::vector<std::vector<cv::Vec2f>> getTargetLines(std::vector<cv::Vec2f> lines, int horiNum, int verNum) {
 
         std::vector<cv::Vec2f> uniqueLines; // [rho theta]
