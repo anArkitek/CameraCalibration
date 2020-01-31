@@ -12,7 +12,13 @@ namespace zw {
             double rho = lines[i][0], theta = lines[i][1];
             bool bMerged = false;
 
+            if (rho < 0 && theta * 180.0 / M_PI > 135) {
+                rho *= -1;
+                theta -= M_PI;
+            }
+
             for (int j = 0; j < uniqueLines.size(); ++j) {
+
                 if (fabs(uniqueLines[j][0] - rho) < 100 && fabs(uniqueLines[j][1] - theta) * 180.0 / M_PI < 10) {
                     memo[j][0] += rho;
                     memo[j][1] += theta;
@@ -29,6 +35,17 @@ namespace zw {
             memo.push_back(cv::Vec3f(rho, theta, 1));
         }
 
+        for (int i = 0; i < uniqueLines.size(); ++i) {
+            if (uniqueLines[i][1] < 0) {
+                uniqueLines[i][0] *= -1;
+                uniqueLines[i][1] += M_PI;
+            }
+        }
+
+        for (int i = 0; i < uniqueLines.size(); ++i) {
+            std::cout << uniqueLines[i][0] << ", " << uniqueLines[i][1] << std::endl;
+        }
+
         assert(memo.size() == uniqueLines.size(), "Issues with accumulating uniqueLines");
 
         // Divde the sum of rhos and thetas by its number
@@ -37,11 +54,34 @@ namespace zw {
             uniqueLines[i][1] = static_cast<double>(memo[i][1]) / memo[i][2];
         }
 
-        //std::cout << "number of lines: " << lines.size() << std::endl;
-        //std::cout << "number of uniqueLines: " << uniqueLines.size() << std::endl;
+        std::cout << uniqueLines.size() << " unique lines are detected from the calibration pad" << std::endl;
+        std::cout << "There are supposed to be " << horiNum << " horizontal lines" << std::endl;
+        std::cout << "There are supposed to be " << verNum << " vertical lines" << std::endl;
+        
+        //for (auto line : uniqueLines) {
+        //    std::cout << line[0] << ", " << line[1] * 180.0f / M_PI << std::endl;
+        //}
 
-        assert(uniqueLines.size() == horiNum + verNum + 4, 
-            "The number of target lines is not the same as the number of lines after hough transform!");
+        /*cv::Mat img;
+        img = cv::imread("srcImgs/003.jpeg");
+        for (size_t i = 0; i < uniqueLines.size(); i++)
+        {
+            double rho = uniqueLines[i][0], theta = uniqueLines[i][1];
+            cv::Point pt1, pt2;
+            double a = cos(theta), b = sin(theta);
+            double x0 = a * rho, y0 = b * rho;
+            pt1.x = cvRound(x0 + 1000 * (-b));
+            pt1.y = cvRound(y0 + 1000 * (a));
+            pt2.x = cvRound(x0 - 1000 * (-b));
+            pt2.y = cvRound(y0 - 1000 * (a));
+            cv::line(img, pt1, pt2, cv::Scalar(0, 0, 255), 3);
+        }
+
+        cv::namedWindow("img", cv::WINDOW_GUI_NORMAL);
+        cv::imshow("img", img);
+        cv::waitKey();*/
+
+        assert(uniqueLines.size() == horiNum + verNum + 4, "The number of target lines is not the same as the number of lines after hough transform!");
 
         // Remove all the side lines
         std::vector<cv::Vec2f> horiLines;
@@ -86,13 +126,13 @@ namespace zw {
     }
 
 
-    std::vector<cv::Point> linesIntersect(std::vector<cv::Vec2f> horiLines, std::vector<cv::Vec2f> verLines) {
+    std::vector<cv::Point2d> twoSetLinesIntersectOnPlane(std::vector<cv::Vec2f> horiLines, std::vector<cv::Vec2f> verLines) {
         
-        std::vector<cv::Point> points;
+        std::vector<cv::Point2d> points;
         
         for (auto horiLine : horiLines) {
             for (auto verLine : verLines) {
-                cv::Point point = twoLinesIntersectOnPlane(horiLine, verLine);
+                cv::Point2d point = twoLinesIntersectOnPlane(horiLine, verLine);
                 points.push_back(point);
             }
         }
@@ -101,7 +141,7 @@ namespace zw {
     }
 
 
-    cv::Point twoLinesIntersectOnPlane(cv::Vec2f line1, cv::Vec2f line2) {
+    cv::Point2d twoLinesIntersectOnPlane(cv::Vec2f line1, cv::Vec2f line2) {
 
         glm::vec3 line1Homo = rhoThetaToHomo(line1);
         glm::vec3 line2Homo = rhoThetaToHomo(line2);
@@ -112,7 +152,7 @@ namespace zw {
         intersect[1] = static_cast<double>(intersect[1]) / intersect[2];
         intersect[2] = 1.0f;
 
-        return cv::Point(intersect[0], intersect[1]);
+        return cv::Point2d(intersect[0], intersect[1]);
     }
 
     
@@ -128,5 +168,59 @@ namespace zw {
         glm::vec3 lineHomo = glm::cross(pt1, pt2);
 
         return lineHomo;
+    }
+
+
+    std::vector<cv::Point2d> initializeCornersOnCalibPad(int row, int col, int length) {
+        std::vector<cv::Point2d> corners;
+        for (int i = 0; i < row; ++i) {
+            for (int j = 0; j < col; ++j) {
+                double x = static_cast<double>(i) * length;
+                double y = static_cast<double>(j) * length;
+                corners.push_back(cv::Point2d(x, y));
+            }
+        }
+
+        return corners;
+    }
+
+    
+    std::vector<std::vector<double>> getA(std::vector<cv::Point2d> pW, std::vector<cv::Point2d> pImg) {
+
+        std::vector<std::vector<double>> A;
+
+        assert(pW.size() == pImg.size(), "The number of points in the world is not the same as the number on the image!");
+
+        for (int i = 0; i < pW.size(); ++i) {
+            std::vector<double> a1 = { pW[i].x, pW[i].y, 1, 0,       0,       0, -pW[i].x * pImg[i].x, -pW[i].y * pImg[i].x, -pImg[i].x };
+            std::vector<double> a2 = { 0,       0,       0, pW[i].x, pW[i].y, 1, -pW[i].x * pImg[i].y, -pW[i].y * pImg[i].y, -pImg[i].y };
+            A.push_back(a1);
+            A.push_back(a2);
+        }
+
+        assert(A.size() == 2 * pW.size() && A[0].size() == 9, "The matrix A is of wrong shape!");
+
+        return A;
+    }
+
+
+    void test() {
+        dlib::matrix<double, 3, 1> y;
+        dlib::matrix<double> M(3, 3);
+
+        M = 54.2, 7.4, 12.1,
+            1, 2, 3,
+            5.9, 0.05, 1;
+
+        y = 3.5,
+            1.2,
+            7.8;
+
+        dlib::matrix<double> x = dlib::inv(M) * y;
+        std::cout << "x : \n " << x << std::endl;
+
+        std::cout << "M * x - y : " << M * x - y << std::endl;
+
+        std::cout << "*******************************" << std::endl;
     }
 }
