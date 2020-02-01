@@ -14,6 +14,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "dlib/matrix.h"
+#include "dlib/matrix/matrix_exp_abstract.h"
 
 #define M_PI                    3.14159265358979323846  /* pi */
 
@@ -99,8 +100,9 @@ namespace zw {
     // Vb = 0
     dlib::matrix<double> getMatrixV(const std::vector<dlib::matrix<double, 3, 3>>& Hall);
 
-    dlib::matrix<double> getVectorb(const std::vector<dlib::matrix<double, 3, 3>>& V);
+    dlib::matrix<double> getVectorb(const dlib::matrix<double, 3, 3>& V);
 
+    dlib::matrix<double, 3, 3> getIntrinsicMatrix(const dlib::matrix<double, 6, 1>& b);
 
     void test();
 }

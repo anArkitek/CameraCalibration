@@ -88,13 +88,13 @@ namespace zw {
             
         }
 
-        dlib::matrix<double> V = getMatrixV(Hall);
+        // dlib::matrix<double> V = getMatrixV(Hall);
 
-        assert(V.nr() == 2 * nImg, "Incorrect Dimension of Matrix V!");
+        // assert(V.nr() == 2 * nImg, "Incorrect Dimension of Matrix V!");
 
-        dlib::matrix<double, 6, 1> b = getVectorb(V);
+        // dlib::matrix<double, 6, 1> b = getVectorb(V);
 
-        dlib::matrix<double, 3, 3> K = getIntrinsicMatrix(b);
+        // dlib::matrix<double, 3, 3> K = getIntrinsicMatrix(b);
 
 
 
@@ -383,6 +383,39 @@ namespace zw {
         return K;
     }
 
+
+    /*dlib::matrix<double, 3, 4> getExtrinsicMatrix(const dlib::matrix<double, 3, 3>& K,
+                                                  const std::vector<dlib::matrix<double, 3, 3>> Hall) {*/
+    int getExtrinsicMatrix(const dlib::matrix<double, 3, 3>& K,
+        const std::vector<dlib::matrix<double, 3, 3>> Hall) {
+
+        dlib::matrix<double, 3, 3> KInverse = dlib::inv(K);
+
+        for (int iH = 0; iH < Hall.size(); ++iH) {
+            dlib::matrix<double, 3, 3> H = Hall.at(iH);
+            dlib::matrix<double, 3, 1> t = KInverse * dlib::colm(H, 2);
+            double r1Norm = std::sqrt(dlib::sum(dlib::squared(dlib::colm(H,0))));
+            double r2Norm = std::sqrt(dlib::sum(dlib::squared(dlib::colm(H, 0))));
+
+            std::cout << "r1Norm: " << r1Norm << std::endl;
+            std::cout << "r2Norm: " << r2Norm << std::endl;
+        
+            if (t(3) < 0) {
+                r1Norm *= -1;
+            }
+
+            dlib::vector < double, 3> r1 = KInverse * dlib::colm(H, 0);
+            dlib::vector < double, 3> r2 = KInverse * dlib::colm(H, 1);
+            dlib::vector < double, 3> r3 = r1.cross(r2);
+            
+            dlib::matrix<double, 3, 3> R;
+            dlib::set_colm(R, 1) = r1;
+            dlib::set_colm(R, 2) = r2;
+            dlib::set_colm(R, 3) = r3;
+        }
+
+        return 1;
+    }
 
 
 
