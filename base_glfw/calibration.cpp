@@ -412,12 +412,24 @@ namespace zw {
             dlib::set_colm(R, 1) = r1;
             dlib::set_colm(R, 2) = r2;
             dlib::set_colm(R, 3) = r3;
+
+
+            // ?
+            t /= r1Norm;
+
+            dlib::matrix<double, 3, 3> U, D, T;
+            dlib::svd(K, U, D, T);
+            R = U * dlib::trans(T);
+
         }
 
         return 1;
     }
 
-
+    std::vector<double> R2AxisAngle(const dlib::matrix<double, 3, 3> R) {
+        double phi = std::acos((static_cast<double>(dlib::trace(R)) - 1) / 2);
+        w = phi / (2 * sin(phi)) * ([R(3, 2) - R(2, 3) R(1, 3) - R(3, 1) R(2, 1) - R(1, 2)])';
+    }
 
     void test() {
         dlib::matrix<double> U(4, 4), D(4, 2), V(2, 2);
