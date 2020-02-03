@@ -8,6 +8,12 @@ namespace zw {
         dlib::matrix<double> params;
         dlib::matrix<double> cornersW (2 * nCorners, 1);      // nCorners * 2
         dlib::matrix<double> cornersImg (2 * nImgs * nCorners, 1);    // nImgs * nCorners * 2
+        std::vector<cv::Point2d> cornersWorld = zw::initializeCornersOnCalibPad(nHoriLines, nColLines, lenBlock);
+
+        for (int iPt = 0; iPt < cornersWorld.size(); ++iPt) {
+            cornersW(iPt * 2) = cornersWorld[iPt].x;
+            cornersW(iPt * 2 + 1) = cornersWorld[iPt].y;
+        }
 
         for (int iImg = 0; iImg < nImgs; ++iImg) {
             std::string filename = "srcImgs/00" + std::to_string(iImg) + ".jpeg";
@@ -42,13 +48,6 @@ namespace zw {
             }
 
             std::vector<cv::Point2d> pointsImg = twoSetLinesIntersectOnPlane(processedLines[0], processedLines[1]);
-
-            std::vector<cv::Point2d> cornersWorld = zw::initializeCornersOnCalibPad(nHoriLines, nColLines, lenBlock);
-
-            for (int iPt = 0; iPt < cornersWorld.size(); ++iPt) {
-                cornersW(iPt * 2) = cornersWorld[iPt].x;
-                cornersW(iPt * 2 + 1) = cornersWorld[iPt].y;
-            }
 
             dbg::printMatrix("cornersW", cornersW);
 
