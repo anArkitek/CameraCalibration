@@ -2,13 +2,14 @@
 
 namespace zw {
 
-    int calibration(int nImg, int nHoriLines, int nColLines, int lenBlock) {
+    int calibration(int nImgs, int nCorners, int nHoriLines, int nColLines, int lenBlock) {
 
         std::vector<dlib::matrix<double, 3, 3>> Hall;
-        dlib::matrix<double> paramsB4LM;
         dlib::matrix<double> params;
+        dlib::matrix<double> cornersW (2 * nCorners, 1);      // nCorners * 2
+        dlib::matrix<double> cornersImg (2 * nImgs * nCorners, 1);    // nImgs * nCorners * 2
 
-        for (int iImg = 0; iImg < nImg; ++iImg) {
+        for (int iImg = 0; iImg < nImgs; ++iImg) {
             std::string filename = "srcImgs/00" + std::to_string(iImg) + ".jpeg";
             cv::Mat src = cv::imread(filename);
 
@@ -43,6 +44,13 @@ namespace zw {
             std::vector<cv::Point2d> pointsImg = twoSetLinesIntersectOnPlane(processedLines[0], processedLines[1]);
 
             std::vector<cv::Point2d> cornersWorld = zw::initializeCornersOnCalibPad(nHoriLines, nColLines, lenBlock);
+
+            for (int iPt = 0; iPt < cornersWorld.size(); ++iPt) {
+                cornersW(iPt * 2) = cornersWorld[iPt].x;
+                cornersW(iPt * 2 + 1) = cornersWorld[iPt].y;
+            }
+
+            dbg::printMatrix("cornersW", cornersW);
 
             if (bDrawPoints) {
                 int cnt = 0;
@@ -91,14 +99,20 @@ namespace zw {
 
         dlib::matrix<double> V(2 * Hall.size(), 6);
         V = getMatrixV(Hall);
-        assert(V.nr() == 2 * nImg, "Incorrect Dimension of Matrix V!");
+        assert(V.nr() == 2 * nImgs, "Incorrect Dimension of Matrix V!");
 
         dlib::matrix<double, 6, 1> b = getVectorb(V);
         
         dlib::matrix<double, 3, 3> K = getIntrinsicMatrix(b);
         /*std::cout << "K : " << std::endl << K << std::endl << "=============" << std::endl;*/
 
-        int res = getExtrinsicMatrix(K, Hall);
+        dlib::matrix<double> parameters;
+
+        parameters = getParamters(K, Hall);
+
+        dbg::printMatrix("parameters", parameters);
+
+        ParaRefine paraRefine();
 
         return 1;
     }
@@ -395,8 +409,29 @@ namespace zw {
         return K;
     }
 
-    std::vector<std::vector<dlib::matrix<double, 3, 1>>> getAllExtrinsics(const dlib::matrix<double, 3, 3>& K, 
-                                                                          const std::vector<dlib::matrix<double, 3, 3>> Hall) {
+    dlib::matrix<double> getParamters(const dlib::matrix<double, 3, 3>& K, 
+                                      const std::vector<dlib::matrix<double, 3, 3>> Hall) {
+
+        dlib::matrix<double, 0, 1> parameters;
+        int cnt = -1;
+
+        if (bRadialDistort) {
+            parameters.set_size(7 + Hall.size() * 6);
+            parameters(5) = 0;
+            parameters(6) = 0;
+            cnt = 6;
+        }
+        else {
+            parameters.set_size(5 + Hall.size() * 6);
+            cnt = 4;
+        }
+
+        // Instrinsics
+        parameters(0) = K(0, 0);
+        parameters(1) = K(0, 1);
+        parameters(2) = K(0, 2);
+        parameters(3) = K(1, 1);
+        parameters(4) = K(1, 2);
 
         dlib::matrix<double, 3, 3> KInverse = dlib::inv(K);
 
@@ -435,29 +470,32 @@ namespace zw {
 
             //dbg::printMatrix("R", R);
 
-            std::vector<double> axisAngle = R2AxisAngle(R);
-            dbg::printMatrix("t", t);
-            dbg::print1dVector("axisAngle", axisAngle);
+            dlib::matrix<double, 3, 1> axisAngle = R2AxisAngle(R);
+            //dbg::printMatrix("t", t);
+            //dbg::printMatrix("axisAngle", axisAngle);
+
+            parameters(cnt + 1) = axisAngle(0);
+            parameters(cnt + 2) = axisAngle(1);
+            parameters(cnt + 3) = axisAngle(2);
+            parameters(cnt + 4) = t(0);
+            parameters(cnt + 5) = t(1);
+            parameters(cnt + 6) = t(2);
+            cnt += 6;
         }
 
-
-
-        return 1;
+        return parameters;
     }
 
-    std::vector<double> R2AxisAngle(const dlib::matrix<double, 3, 3> R) {
+
+    dlib::matrix<double, 3, 1> R2AxisAngle(const dlib::matrix<double, 3, 3> R) {
         double phi = std::acos((static_cast<double>(dlib::trace(R)) - 1) / 2);
         dlib::matrix<double, 3, 1> w_temp;
         w_temp = R(2, 1) - R(1, 2), R(0, 2) - R(2, 0), R(1, 0) - R(0, 1);
         dlib::matrix<double, 3, 1> w = phi / (2 * std::sin(phi)) * w_temp;
-        std::vector<double> axisAngle;
-        axisAngle.push_back(w(0));
-        axisAngle.push_back(w(1));
-        axisAngle.push_back(w(2));
-        axisAngle.push_back(phi);
 
-        return axisAngle;
+        return w;
     }
+
 
     void test() {
         dlib::matrix<double> U(4, 4), D(4, 2), V(2, 2);
