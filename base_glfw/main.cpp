@@ -66,6 +66,8 @@ int main() {
 
 	int test = zw::calibration(4);
 
+	return 0;
+
 	std::cout << "Hello, OpenGL!" << std::endl;
 	
 	initGLFW();

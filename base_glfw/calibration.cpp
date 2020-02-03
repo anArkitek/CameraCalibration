@@ -5,6 +5,8 @@ namespace zw {
     int calibration(int nImg, int nHoriLines, int nColLines, int lenBlock) {
 
         std::vector<dlib::matrix<double, 3, 3>> Hall;
+        dlib::matrix<double> paramsB4LM;
+        dlib::matrix<double> params;
 
         for (int iImg = 0; iImg < nImg; ++iImg) {
             std::string filename = "srcImgs/00" + std::to_string(iImg) + ".jpeg";
@@ -73,7 +75,6 @@ namespace zw {
             }
             
             dlib::matrix<double, 3, 3> H = zw::homographyestimation(cornersWorld, pointsImg);
-
             Hall.push_back(H);
 
             if (bShowImgs) {
@@ -88,18 +89,20 @@ namespace zw {
             
         }
 
-        // dlib::matrix<double> V = getMatrixV(Hall);
+        dlib::matrix<double> V(2 * Hall.size(), 6);
+        V = getMatrixV(Hall);
+        assert(V.nr() == 2 * nImg, "Incorrect Dimension of Matrix V!");
 
-        // assert(V.nr() == 2 * nImg, "Incorrect Dimension of Matrix V!");
+        dlib::matrix<double, 6, 1> b = getVectorb(V);
+        
+        dlib::matrix<double, 3, 3> K = getIntrinsicMatrix(b);
+        /*std::cout << "K : " << std::endl << K << std::endl << "=============" << std::endl;*/
 
-        // dlib::matrix<double, 6, 1> b = getVectorb(V);
-
-        // dlib::matrix<double, 3, 3> K = getIntrinsicMatrix(b);
-
-
+        int res = getExtrinsicMatrix(K, Hall);
 
         return 1;
     }
+    
 
     std::vector<std::vector<cv::Vec2f>> getTargetLines(std::vector<cv::Vec2f> lines, int horiNum, int verNum) {
 
@@ -141,9 +144,9 @@ namespace zw {
             }
         }
 
-        for (int i = 0; i < uniqueLines.size(); ++i) {
-            std::cout << uniqueLines[i][0] << ", " << uniqueLines[i][1] << std::endl;
-        }
+        //for (int i = 0; i < uniqueLines.size(); ++i) {
+        //    std::cout << uniqueLines[i][0] << ", " << uniqueLines[i][1] << std::endl;
+        //}
 
         assert(memo.size() == uniqueLines.size(), "Issues with accumulating uniqueLines");
 
@@ -153,9 +156,9 @@ namespace zw {
             uniqueLines[i][1] = static_cast<double>(memo[i][1]) / memo[i][2];
         }
 
-        std::cout << uniqueLines.size() << " unique lines are detected from the calibration pad" << std::endl;
-        std::cout << "There are supposed to be " << horiNum << " horizontal lines" << std::endl;
-        std::cout << "There are supposed to be " << verNum << " vertical lines" << std::endl;
+        //std::cout << uniqueLines.size() << " unique lines are detected from the calibration pad" << std::endl;
+        //std::cout << "There are supposed to be " << horiNum << " horizontal lines" << std::endl;
+        //std::cout << "There are supposed to be " << verNum << " vertical lines" << std::endl;
         
         //for (auto line : uniqueLines) {
         //    std::cout << line[0] << ", " << line[1] * 180.0f / M_PI << std::endl;
@@ -336,24 +339,33 @@ namespace zw {
 
 
     dlib::matrix<double> getMatrixV(const std::vector<dlib::matrix<double, 3, 3>>& Hall) {
-        dlib::matrix<double> V(Hall.size() * 2, 9);
+        dlib::matrix<double> V(Hall.size() * 2, 6);
         int cnt = 0;
         for (auto H : Hall) {
             int i = 0; int j = 1;
-            dlib::matrix<double> v12(1, 9);
+            dlib::matrix<double> v12(1, 6);
             v12 = H(0, i) * H(0, j),                     H(0, i) * H(1, j) + H(1, i) * H(0, j), H(1, i) * H(1, j), 
                   H(2, i) * H(0, j) + H(0, i) * H(2, j), H(2, i) * H(1, j) + H(1, i) * H(2, j), H(2, i) * H(2, j);
-            i = 1; j = 1;
-            dlib::matrix<double> v11(1, 9);
+
+            i = 0; j = 0;
+            dlib::matrix<double> v11(1, 6);
             v11 = H(0, i) * H(0, j),                     H(0, i) * H(1, j) + H(1, i) * H(0, j), H(1, i) * H(1, j), 
                   H(2, i) * H(0, j) + H(0, i) * H(2, j), H(2, i) * H(1, j) + H(1, i) * H(2, j), H(2, i) * H(2, j);
-            i = 2; j = 2;
-            dlib::matrix<double> v22(1, 9);
+            
+            i = 1; j = 1;
+            dlib::matrix<double> v22(1, 6);
             v22 = H(0, i) * H(0, j),                     H(0, i) * H(1, j) + H(1, i) * H(0, j), H(1, i) * H(1, j), 
                   H(2, i) * H(0, j) + H(0, i) * H(2, j), H(2, i) * H(1, j) + H(1, i) * H(2, j), H(2, i) * H(2, j);
 
             dlib::set_rowm(V, cnt) = v12;
-            dlib::set_rowm(V, cnt + 1) = v11 - v12;
+            dlib::set_rowm(V, cnt + 1) = v11 - v22;
+
+            //std::cout << "v11" << std::endl;
+            //std::cout << v11 << std::endl << "=====================" << std::endl;
+            //std::cout << "v22" << std::endl;
+            //std::cout << v22 << std::endl << "=====================" << std::endl;
+            //std::cout << "v11-v22" << std::endl;
+            //std::cout << v11-v22 << std::endl << "=====================" << std::endl;
             cnt += 2;
         }
         return V;
@@ -370,12 +382,12 @@ namespace zw {
     
 
     dlib::matrix<double, 3, 3> getIntrinsicMatrix(const dlib::matrix<double, 6, 1>& b) {
-        double y0 = (b(2) * b(4) - b(1) * b(5)) / (b(1) * b(3) - b(2) * b(2));
-        double lambda = b(6) - (b(4) * b(4) + y0 * (b(2) * b(4) - b(1) * b(5))) / b(1);
-        double ax = std::sqrt(lambda / b(1));
-        double ay = std::sqrt(lambda * b(1) / (b(1) * b(3) - b(2) * b(2)));
-        double s = - b(2) * ax * ax * ay / lambda;
-        double x0 = s * y0 / ay - b(4) * ax * ax / lambda;
+        double y0 = (b(1) * b(3) - b(0) * b(4)) / (b(0) * b(2) - b(1) * b(1));
+        double lambda = b(5) - (b(3) * b(3) + y0 * (b(1) * b(3) - b(0) * b(4))) / b(0);
+        double ax = std::sqrt(lambda / b(0));
+        double ay = std::sqrt(lambda * b(0) / (b(0) * b(2) - b(1) * b(1)));
+        double s = - b(1) * ax * ax * ay / lambda;
+        double x0 = s * y0 / ay - b(3) * ax * ax / lambda;
         dlib::matrix<double, 3, 3> K;
         K = ax, s,  x0, 
             0,  ay, y0, 
@@ -383,52 +395,68 @@ namespace zw {
         return K;
     }
 
-
-    /*dlib::matrix<double, 3, 4> getExtrinsicMatrix(const dlib::matrix<double, 3, 3>& K,
-                                                  const std::vector<dlib::matrix<double, 3, 3>> Hall) {*/
-    int getExtrinsicMatrix(const dlib::matrix<double, 3, 3>& K,
-        const std::vector<dlib::matrix<double, 3, 3>> Hall) {
+    std::vector<std::vector<dlib::matrix<double, 3, 1>>> getAllExtrinsics(const dlib::matrix<double, 3, 3>& K, 
+                                                                          const std::vector<dlib::matrix<double, 3, 3>> Hall) {
 
         dlib::matrix<double, 3, 3> KInverse = dlib::inv(K);
 
         for (int iH = 0; iH < Hall.size(); ++iH) {
             dlib::matrix<double, 3, 3> H = Hall.at(iH);
             dlib::matrix<double, 3, 1> t = KInverse * dlib::colm(H, 2);
-            double r1Norm = std::sqrt(dlib::sum(dlib::squared(dlib::colm(H,0))));
-            double r2Norm = std::sqrt(dlib::sum(dlib::squared(dlib::colm(H, 0))));
+
+            double r1Norm = std::sqrt(dlib::sum(dlib::squared(KInverse * dlib::colm(H, 0))));
+            double r2Norm = std::sqrt(dlib::sum(dlib::squared(KInverse * dlib::colm(H, 1))));
 
             std::cout << "r1Norm: " << r1Norm << std::endl;
             std::cout << "r2Norm: " << r2Norm << std::endl;
         
-            if (t(3) < 0) {
+            if (t(2) < 0) {
                 r1Norm *= -1;
             }
 
-            dlib::vector < double, 3> r1 = KInverse * dlib::colm(H, 0);
-            dlib::vector < double, 3> r2 = KInverse * dlib::colm(H, 1);
+
+            dlib::vector < double, 3> r1 = KInverse * dlib::colm(H, 0) / r1Norm;
+            dlib::vector < double, 3> r2 = KInverse * dlib::colm(H, 1) / r2Norm;
             dlib::vector < double, 3> r3 = r1.cross(r2);
             
             dlib::matrix<double, 3, 3> R;
-            dlib::set_colm(R, 1) = r1;
-            dlib::set_colm(R, 2) = r2;
-            dlib::set_colm(R, 3) = r3;
+            dlib::set_colm(R, 0) = r1;
+            dlib::set_colm(R, 1) = r2;
+            dlib::set_colm(R, 2) = r3;
 
 
-            // ?
             t /= r1Norm;
 
-            dlib::matrix<double, 3, 3> U, D, T;
-            dlib::svd(K, U, D, T);
-            R = U * dlib::trans(T);
+            //dbg::printMatrix("R", R);
+            //dlib::matrix<double, 3, 3> U, D, T;
+            //dlib::svd(K, U, D, T);
+           
+            //R = U * dlib::trans(T);
 
+            //dbg::printMatrix("R", R);
+
+            std::vector<double> axisAngle = R2AxisAngle(R);
+            dbg::printMatrix("t", t);
+            dbg::print1dVector("axisAngle", axisAngle);
         }
+
+
 
         return 1;
     }
 
     std::vector<double> R2AxisAngle(const dlib::matrix<double, 3, 3> R) {
         double phi = std::acos((static_cast<double>(dlib::trace(R)) - 1) / 2);
-        w = phi / (2 * sin(phi)) * ([R(3, 2) - R(2, 3) R(1, 3) - R(3, 1) R(2, 1) - R(1, 2)])';
+        dlib::matrix<double, 3, 1> w_temp;
+        w_temp = R(2, 1) - R(1, 2), R(0, 2) - R(2, 0), R(1, 0) - R(0, 1);
+        dlib::matrix<double, 3, 1> w = phi / (2 * std::sin(phi)) * w_temp;
+        std::vector<double> axisAngle;
+        axisAngle.push_back(w(0));
+        axisAngle.push_back(w(1));
+        axisAngle.push_back(w(2));
+        axisAngle.push_back(phi);
+
+        return axisAngle;
     }
 
     void test() {

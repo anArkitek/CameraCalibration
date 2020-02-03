@@ -15,6 +15,9 @@
 
 #include "dlib/matrix.h"
 #include "dlib/matrix/matrix_exp_abstract.h"
+#include "dlib/optimization.h"
+
+#include "debug.h"
 
 #define M_PI                    3.14159265358979323846  /* pi */
 
@@ -25,7 +28,6 @@
 
 
 namespace zw {
-
 
     int calibration(int nImg, int nHoriLines = 4, int nColLines = 7, int lenBlock = 20);
      /*
@@ -100,9 +102,71 @@ namespace zw {
     // Vb = 0
     dlib::matrix<double> getMatrixV(const std::vector<dlib::matrix<double, 3, 3>>& Hall);
 
-    dlib::matrix<double> getVectorb(const dlib::matrix<double, 3, 3>& V);
+    dlib::matrix<double> getVectorb(const dlib::matrix<double>& V);
 
     dlib::matrix<double, 3, 3> getIntrinsicMatrix(const dlib::matrix<double, 6, 1>& b);
+
+    // rotation axis w and translate t
+    std::vector<std::vector<dlib::matrix<double, 3, 1>>> getAllExtrinsics(const dlib::matrix<double, 3, 3>& K, const std::vector<dlib::matrix<double, 3, 3>> Hall);
+
+    std::vector<double> R2AxisAngle(const dlib::matrix<double, 3, 3> R);
+
+
+    class ParaRefine {
+    public:
+        ParaRefine() = default;
+
+        ParaRefine(dlib::matrix<double> input, dlib::matrix<double> output, dlib::matrix<double> parameters, bool bRadial, int nImg, int nCorners) {
+            this->bRadial = bRadial;
+            this->nImg = nImg;
+            this->nCorners = nCorners;
+        }
+
+        void residual() {
+            double ax = parameters(0);
+            double s = parameters(1);
+            double x0 = parameters(2);
+            double ay = parameters(3);
+            double y0 = parameters(4);
+
+            dlib::matrix<double, 3, 3> K;
+            int cnt = -1;
+            double k1 = -1;
+            double k2 = -1;
+            if (bRadial) {
+                K = ax, 0, x0, 0, ay, y0, 0, 0, 1;
+                k1 = 0;
+                k2 = 0;
+                cnt = 6;
+            }
+            else {
+                K = ax, s, x0, 0, ay, y0, 0, 0, 1;
+                cnt = 4;
+            }
+
+            dlib::matrix<double> pointsHat(nImg * nCorners, 1);
+
+
+            int n1 = 0;
+            for (int iImg = 0; iImg < nImg; ++iImg) {
+                
+                
+                for (int iCorners = 0; iCorners < nCorners; ++iCorners) {
+
+                }
+
+            }
+
+        }
+
+    private:
+        int                     nImg;
+        int                     nCorners;
+        bool                    bRadial;
+        dlib::matrix<double>    parameters;
+        dlib::matrix<double>
+
+    };
 
     void test();
 }
