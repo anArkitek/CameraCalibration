@@ -119,31 +119,14 @@ namespace zw {
     public:
         ParaRefine() = default;
 
-        //ParaRefine(const dlib::matrix<double>& cornersW, 
-        //           const dlib::matrix<double>& cornersImg, 
-        //           const dlib::matrix<double>& parameters, 
-        //           bool bRadial, 
-        //           int nImgs, 
-        //           int nCorners) {
-        //    
-        //    this->cornersW = cornersW;
-        //    this->cornersImg = cornersImg;
-        //    this->parameters = parameters;
-        //    this->bRadial = bRadial;
-        //    this->nImgs = nImgs;
-        //    this->nCorners = nCorners;
-        //}
-
-        dlib::matrix<double, 2, 1> model(const dlib::matrix<double, 3, 1>& input, const dlib::matrix<double, 12, 1> parameters) {
-
-        }
-
-        double residual(const std::pair<dlib::matrix<double, 2, 1>&, const dlib::matrix<double, 2, 1>>& datasample) {
+        // input: coordinates on the calibration pad
+        // parameters: 5 instrinsic + 2 distortion + 6 extrinsic
+        static dlib::matrix<double> model(const dlib::matrix<double>& cornersW, const dlib::matrix<double, 13, 1> parameters) {
             
-
+            assert(cornersW.nr() == 2 * nCorners, "Input for LM Optimization is incorrect!");
             
             double ax = parameters(0);
-            double s = parameters(1);
+            double s  = parameters(1);
             double x0 = parameters(2);
             double ay = parameters(3);
             double y0 = parameters(4);
@@ -160,75 +143,100 @@ namespace zw {
                 cnt = 6;    // 5 intrinsic parameters + 2 radial distortion parameters
             }
             else {
-                K1 = ax, s, x0, 0, ay, y0, 0, 0, 1;
+                K1 = ax, 0, x0, 0, ay, y0, 0, 0, 1;
                 cnt = 4;
             }
 
+            dlib::matrix<double, 3, 1> w, t;
+            w = parameters(cnt + 1), parameters(cnt + 2), parameters(cnt + 3);
+            t = parameters(cnt + 4), parameters(cnt + 5), parameters(cnt + 6);
+            cnt += 6;
+
+            dlib::matrix<double, 3, 3> wcross;
+            wcross = 0, -w(2), w(1), w(2), 0, -w(0), -w(1), w(0), 0;
+
+            dlib::matrix<double, 3, 3> U, D, V;
+            dlib::svd(wcross, U, D, V);
+            double phi = D(0, 0) > D(1, 1) ? (D(0, 0) > D(2, 2) ? D(0, 0) : D(2, 2)) : (D(1, 1) > D(2, 2) ? D(1, 1) : D(2, 2));
+            dlib::matrix<double, 3, 3> R;
+            R = dlib::identity_matrix<double>(3) + std::sin(phi) / phi * wcross + (1 - std::cos(phi)) / phi * wcross * wcross;
+
+            dlib::matrix<double, 3, 4> extrinsicMatrix;
+            dlib::set_colm(extrinsicMatrix, dlib::range(0, 2)) = R;
+            dlib::set_colm(extrinsicMatrix, 3) = t;
+
             // the points calculated from the projection
-            dlib::matrix<double> cornersHat(nImgs * nCorners, 1);
+            dlib::matrix<double> cornersHat(nCorners * 2, 1);
+            int n2 = 0; // for xW
+            for (int iCorners = 0; iCorners < nCorners; ++iCorners) {
+                dlib::matrix<double, 4, 1> xW;
+                xW = cornersW(n2), cornersW(n2 + 1), 0, 1;
+                dlib::matrix<double, 3, 1> x;
+                x = K * extrinsicMatrix * xW;
+                cornersHat(n2) = x(0) / x(2);
+                cornersHat(n2 + 1) = x(1) / x(2);
 
+                if (bRadial) {
+                    dlib::matrix<double, 3, 1>xp;
+                    xp = cornersHat(n2), cornersHat(n2 + 1), 1;
 
-            int n1 = 0; // for cornersHat
-            for (int iImg = 0; iImg < nImgs; ++iImg) {
-                
-                dlib::matrix<double, 3, 1> w, t;
-                w = parameters(cnt + 1), parameters(cnt + 2), parameters(cnt + 3);
-                t = parameters(cnt + 4), parameters(cnt + 5), parameters(cnt + 6);
-                cnt += 6;
-
-                dlib::matrix<double, 3, 3> wcross;
-                wcross = 0, -w(2), w(1), w(2), 0, -w(0), -w(1), w(0), 0;
-
-                dlib::matrix<double, 3, 3> U, D, V;
-                dlib::svd(wcross, U, D, V);
-                double phi = D(0, 0) > D(1, 1) ? (D(0, 0) > D(2, 2) ? D(0, 0) : D(2, 2)) : (D(1, 1) > D(2, 2) ? D(1, 1) : D(2, 2));
-                dlib::matrix<double, 3, 3> R;
-                R = dlib::identity_matrix<double>(3) + std::sin(phi) / phi * wcross + (1 - std::cos(phi)) / phi * wcross * wcross;
-
-                dlib::matrix<double, 3, 4> extrinsicMatrix;
-                dlib::set_colm(extrinsicMatrix, dlib::range(0, 2)) = R;
-                dlib::set_colm(extrinsicMatrix, 3) = t;
-
-                int n2 = 0; // for xW
-                for (int iCorners = 0; iCorners < nCorners; ++iCorners) {
-                    dlib::matrix<double, 4, 1> xW;
-                    xW = cornersW(n2), cornersW(n2 + 1), 0, 1;
-                    dlib::matrix<double, 3, 1> x;
-                    x = K * extrinsicMatrix * xW;
-                    cornersHat(n1) = x(0) / x(2);
-                    cornersHat(n1 + 1) = x(1) / x(2);
-
-                    if (bRadial) {
-                        dlib::matrix<double, 3, 1>xp;
-                        xp = cornersHat(n1), cornersHat(n1 + 1), 1;
-                        
-                        dlib::matrix<double, 3, 1> xw = dlib::inv(K1) * xp;
-                        double r2 = xw(0) * xw(0) + xw(1) * xw(1);
-                        double xp1 = xw(0) + xw(0) * (k1 * r2 + k2 * r2 * r2);
-                        double xp2 = xw(1) + xw(1) * (k1 * r2 + k2 * r2 * r2);
-                        dlib::matrix<double, 3, 1> tmpx;
-                        tmpx = xp1, xp2, 1;
-                        x = K1 * tmpx;
-                        cornersHat(n1) = x(0) / x(2);
-                        cornersHat(n1 + 1) = x(1) / x(2);                    
-                    }
-                    n1 += 2;
-                    n2 += 2;
+                    dlib::matrix<double, 3, 1> xw = dlib::inv(K1) * xp;
+                    double r2 = xw(0) * xw(0) + xw(1) * xw(1);
+                    double xp1 = xw(0) + xw(0) * (k1 * r2 + k2 * r2 * r2);
+                    double xp2 = xw(1) + xw(1) * (k1 * r2 + k2 * r2 * r2);
+                    dlib::matrix<double, 3, 1> tmpx;
+                    tmpx = xp1, xp2, 1;
+                    x = K1 * tmpx;
+                    cornersHat(n2) = x(0) / x(2);
+                    cornersHat(n2 + 1) = x(1) / x(2);
                 }
+                n2 += 2;
+            }
+            return cornersHat;
+        }
 
+
+        static double residual(const std::pair<dlib::matrix<double>, dlib::matrix<double>>& data,
+            const dlib::matrix<double>& parameters) {
+
+            double error = 0;
+
+            assert(data.first.nr() == 2 * nCorners, "numbers of world corners have issues!");
+            assert(data.second.nr() == 2 * nImgs * nCorners, "numbers of image corners have issues!");
+            if (bRadial) {
+                assert(parameters.nr() == 7 + 6 * nImgs, "numbers of parameters have issues!");
+            }
+            else {
+                assert(parameters.nr() == 5 + 6 * nImgs, "numbers of parameters have issues!");
+            }
+            for (int iImg = 0; iImg < nImgs; ++iImg) {
+                dlib::matrix<double> cornersPerImage = dlib::rowm(data.second, dlib::range(iImg * 2 * nCorners, (iImg + 1) * 2 * nCorners - 1));
+                
+                dlib::matrix<double> parasPerImage(0, 1);
+                if (bRadial) {
+                    parasPerImage.set_size(13, 1);
+                    dlib::set_rowm(parasPerImage, dlib::range(0, 6)) = dlib::rowm(parameters, dlib::range(0, 6));
+                    dlib::set_rowm(parasPerImage, dlib::range(7, 12)) = dlib::rowm(parameters, dlib::range(7 + iImg * 6, (iImg + 1) * 6 + 6));
+                }
+                else {
+                    parasPerImage.set_size(11, 1);
+                    dlib::set_rowm(parasPerImage, dlib::range(0, 4)) = dlib::rowm(parameters, dlib::range(0, 4));
+                    dlib::set_rowm(parasPerImage, dlib::range(5, 10)) = dlib::rowm(parameters, dlib::range(5 + iImg * 6, (iImg + 1) * 6 + 4));
+                }
+                
+                assert(cornersPerImage.nr() == nCorners * 2);
+                dlib::matrix<double> cornersHat(2 * nCorners, 1);
+                cornersHat = model(data.first, parasPerImage);
+
+                error += dlib::sum(dlib::squared(cornersHat - cornersPerImage));
             }
 
-            double error = dlib::sum(dlib::squared(cornersImg - cornersHat));
             return error;
-        } 
+        }
 
-    private:
-        int                     nImgs;
-        int                     nCorners;
-        bool                    bRadial;
-        dlib::matrix<double>    parameters;
-        dlib::matrix<double>    cornersImg;
-        dlib::matrix<double>    cornersW;
+        static int                     nImgs;
+        static int                     nCorners;
+        static bool                    bRadial;
     };
 
     void test();

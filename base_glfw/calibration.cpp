@@ -2,6 +2,10 @@
 
 namespace zw {
 
+    int ParaRefine::nImgs = 4;
+    int ParaRefine::nCorners = 28;
+    bool ParaRefine::bRadial = true;
+
     int calibration(int nImgs, int nCorners, int nHoriLines, int nColLines, int lenBlock) {
 
         std::vector<dlib::matrix<double, 3, 3>> Hall;
@@ -74,7 +78,7 @@ namespace zw {
                     myfile << "==============================================\n";
                     myfile << "Image Order " << std::to_string(iImg) << "\n";
                     myfile << "Points on images: \n";
-
+                    
                     for (int i = 0; i < pointsImg.size(); ++i) {
                         myfile << pointsImg[i].x << " " << pointsImg[i].y << std::endl;
                     }
@@ -115,14 +119,41 @@ namespace zw {
         dlib::matrix<double> parameters;
 
         parameters = getParamters(K, Hall);
-
+        if (bRadialDistort) {
+            assert(parameters.nr() == nImgs * 6 + 7);
+        }
         //dbg::printMatrix("parameters", parameters);
 
-        ParaRefine paraRefine;
+        std::pair<dlib::matrix<double>, dlib::matrix<double>> data = std::make_pair(cornersW, cornersImg);
+
+
+
+        //////////////////////////////////////////////////
+        //// DEBUG
+
+        double error = ParaRefine::residual(data, parameters);
+        std::cout << "error: " << error << std::endl;
+
+        //int iImg = 0;
+        //dlib::matrix<double> parasPerImage(0, 1);
+        //if (bRadialDistort) {
+        //    parasPerImage.set_size(13, 1);
+        //    dlib::set_rowm(parasPerImage, dlib::range(0, 6)) = dlib::rowm(parameters, dlib::range(0, 6));
+        //    dlib::set_rowm(parasPerImage, dlib::range(7, 12)) = dlib::rowm(parameters, dlib::range(7 + iImg * 6, (iImg + 1) * 6 + 6));
+        //}
+        //else {
+        //    parasPerImage.set_size(11, 1);
+        //    dlib::set_rowm(parasPerImage, dlib::range(0, 4)) = dlib::rowm(parameters, dlib::range(0, 4));
+        //    dlib::set_rowm(parasPerImage, dlib::range(5, 10)) = dlib::rowm(parameters, dlib::range(5 + iImg * 6, (iImg + 1) * 6 + 4));
+        //}
+        //dlib::matrix<double> cornersHat = ParaRefine::model(data.first, parasPerImage);
+        //dbg::printMatrix("cornersHat", cornersHat);
+        ////////////////////////////////////////////////////
+
         dlib::solve_least_squares_lm(dlib::objective_delta_stop_strategy(1e-7).be_verbose(),
-            paraRefine.residual,
-            dlib::derivative(paraRefine.residual),
-            cornersW,
+            ParaRefine::residual,
+            dlib::derivative(ParaRefine::residual),
+            data,
             parameters);
 
         return 1;
@@ -480,7 +511,7 @@ namespace zw {
            
             //R = U * dlib::trans(T);
 
-            dbg::printMatrix("R", R);
+            //dbg::printMatrix("R", R);
 
             dlib::matrix<double, 3, 1> axisAngle = R2AxisAngle(R);
             //dbg::printMatrix("t", t);
