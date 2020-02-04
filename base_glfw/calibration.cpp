@@ -9,6 +9,7 @@ namespace zw {
         dlib::matrix<double> cornersW (2 * nCorners, 1);      // nCorners * 2
         dlib::matrix<double> cornersImg (2 * nImgs * nCorners, 1);    // nImgs * nCorners * 2
         std::vector<cv::Point2d> cornersWorld = zw::initializeCornersOnCalibPad(nHoriLines, nColLines, lenBlock);
+        //dbg::printMatrix("cornersW", cornersW);
 
         for (int iPt = 0; iPt < cornersWorld.size(); ++iPt) {
             cornersW(iPt * 2) = cornersWorld[iPt].x;
@@ -49,7 +50,11 @@ namespace zw {
 
             std::vector<cv::Point2d> pointsImg = twoSetLinesIntersectOnPlane(processedLines[0], processedLines[1]);
 
-            dbg::printMatrix("cornersW", cornersW);
+            int startPos = iImg * nCorners * 2;
+            for (int iPt = 0; iPt < pointsImg.size(); ++iPt) {
+                cornersImg(startPos + iPt * 2) = pointsImg[iPt].x;
+                cornersImg(startPos + iPt * 2 + 1) = pointsImg[iPt].y;
+            }
 
             if (bDrawPoints) {
                 int cnt = 0;
@@ -96,6 +101,8 @@ namespace zw {
             
         }
 
+        //dbg::printMatrix("cornersImg", cornersImg);
+
         dlib::matrix<double> V(2 * Hall.size(), 6);
         V = getMatrixV(Hall);
         assert(V.nr() == 2 * nImgs, "Incorrect Dimension of Matrix V!");
@@ -109,9 +116,14 @@ namespace zw {
 
         parameters = getParamters(K, Hall);
 
-        dbg::printMatrix("parameters", parameters);
+        //dbg::printMatrix("parameters", parameters);
 
-        ParaRefine paraRefine();
+        ParaRefine paraRefine;
+        dlib::solve_least_squares_lm(dlib::objective_delta_stop_strategy(1e-7).be_verbose(),
+            paraRefine.residual,
+            dlib::derivative(paraRefine.residual),
+            cornersW,
+            parameters);
 
         return 1;
     }
@@ -441,8 +453,8 @@ namespace zw {
             double r1Norm = std::sqrt(dlib::sum(dlib::squared(KInverse * dlib::colm(H, 0))));
             double r2Norm = std::sqrt(dlib::sum(dlib::squared(KInverse * dlib::colm(H, 1))));
 
-            std::cout << "r1Norm: " << r1Norm << std::endl;
-            std::cout << "r2Norm: " << r2Norm << std::endl;
+            //std::cout << "r1Norm: " << r1Norm << std::endl;
+            //std::cout << "r2Norm: " << r2Norm << std::endl;
         
             if (t(2) < 0) {
                 r1Norm *= -1;
@@ -461,13 +473,14 @@ namespace zw {
 
             t /= r1Norm;
 
+            // Condition the matrix by setting singular values all to be 1
             //dbg::printMatrix("R", R);
             //dlib::matrix<double, 3, 3> U, D, T;
             //dlib::svd(K, U, D, T);
            
             //R = U * dlib::trans(T);
 
-            //dbg::printMatrix("R", R);
+            dbg::printMatrix("R", R);
 
             dlib::matrix<double, 3, 1> axisAngle = R2AxisAngle(R);
             //dbg::printMatrix("t", t);
